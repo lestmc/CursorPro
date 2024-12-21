@@ -1,7 +1,7 @@
 import { Version } from './models/Version';
 import { DownloadStats } from './models/Stats';
 import { verifyToken, isAdmin } from './middleware/auth';
-import { upload } from './utils/s3Upload';
+import { handleMultipleUploads } from './utils/uploadHandler';
 import dbConnect from './utils/dbConnect';
 
 export const config = {
@@ -36,45 +36,34 @@ async function handleGetVersions(req, res) {
         res.json(versions);
     } catch (error) {
         console.error('获取版本列表失败:', error);
-        res.status(500).json({ error: '获取版本列表失���' });
+        res.status(500).json({ error: '获取版本列表失败' });
     }
 }
 
 async function handleUploadVersion(req, res) {
     try {
-        const uploadFields = upload.fields([
-            { name: 'windows', maxCount: 1 },
-            { name: 'mac', maxCount: 1 },
-            { name: 'linux', maxCount: 1 }
-        ]);
+        // 使用新的上传处理器
+        const urls = await handleMultipleUploads(req, res);
+        
+        const { version, description } = req.body;
 
-        uploadFields(req, res, async function(err) {
-            if (err) {
-                console.error('文件上传错误:', err);
-                return res.status(400).json({ error: err.message });
-            }
+        const newVersion = new Version({
+            version,
+            description,
+            windowsUrl: urls.windowsUrl,
+            macUrl: urls.macUrl,
+            linuxUrl: urls.linuxUrl
+        });
 
-            const { version, description } = req.body;
-            const files = req.files;
+        await newVersion.save();
 
-            const newVersion = new Version({
-                version,
-                description,
-                windowsUrl: files.windows?.[0]?.location,
-                macUrl: files.mac?.[0]?.location,
-                linuxUrl: files.linux?.[0]?.location
-            });
-
-            await newVersion.save();
-
-            res.status(201).json({
-                message: '版本上传成功',
-                version: newVersion
-            });
+        res.status(201).json({
+            message: '版本上传成功',
+            version: newVersion
         });
     } catch (error) {
         console.error('版本上传失败:', error);
-        res.status(500).json({ error: '版本上传失败' });
+        res.status(500).json({ error: error.message || '版本上传失败' });
     }
 }
 
