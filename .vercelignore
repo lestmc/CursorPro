@@ -1,0 +1,13 @@
+README.md
+.git
+.env
+.env.local
+node_modules
+*.log
+.gitignore
+.DS_Store
+.vscode/
+.idea/
+server/
+uploads/*
+!uploads/.gitkeep 
